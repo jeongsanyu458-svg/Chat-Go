@@ -1,10 +1,10 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const mongoose = require('mongoose');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const mongoose = require('mongoose');
 
 const app = express();
 const server = http.createServer(app);
@@ -12,31 +12,9 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 
-mongoose.connect(process.env.MONGO_URI)
-.then(() => console.log('MongoDB connected'))
-.catch(err => console.log(err));
-
-const Room = mongoose.model('Room', new mongoose.Schema({
-  id: Number,
-  name: String,
-  owner: String,
-  password: String
-}));
-
-const Message = mongoose.model('Message', new mongoose.Schema({
-  roomId: String,
-  nickname: String,
-  message: String,
-  file: Object,
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-}));
-
+app.use(express.json());
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
-app.use(express.json());
 
 if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads');
@@ -56,63 +34,126 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({
-  storage,
-  limits: {
-    fileSize: 1024 * 1024 * 100
-  }
+  storage
 });
 
+console.log("MONGO URI:");
+console.log(process.env.MONGO_URI);
+
+mongoose.connect(process.env.MONGO_URI)
+.then(() => {
+  console.log("MongoDB connected");
+})
+.catch(err => {
+  console.log("MONGO ERROR:");
+  console.log(err);
+});
+
+const Room = mongoose.model(
+  'Room',
+  new mongoose.Schema({
+    id: Number,
+    name: String,
+    owner: String,
+    password: String
+  })
+);
+
+const Message = mongoose.model(
+  'Message',
+  new mongoose.Schema({
+    roomId: String,
+    nickname: String,
+    message: String,
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  })
+);
+
 app.get('/rooms', async (req, res) => {
-  const rooms = await Room.find().sort({_id:-1});
-  res.json(rooms);
+
+  try {
+
+    const rooms = await Room.find();
+
+    res.json(rooms);
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      error: err.message
+    });
+  }
 });
 
 app.post('/create-room', async (req, res) => {
 
-  const room = {
-    id: Date.now(),
-    name: req.body.name,
-    owner: req.body.owner,
-    password: req.body.password || ''
-  };
+  try {
 
-  await Room.create(room);
+    const room = {
+      id: Date.now(),
+      name: req.body.name,
+      owner: req.body.owner,
+      password: req.body.password || ''
+    };
 
-  res.json(room);
+    await Room.create(room);
+
+    res.json(room);
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      error: err.message
+    });
+  }
 });
 
 app.post('/verify-room', async (req, res) => {
 
-  const room = await Room.findOne({
-    id: req.body.roomId
-  });
+  try {
 
-  if (!room) {
+    const room = await Room.findOne({
+      id: req.body.roomId
+    });
 
-    return res.json({
+    if (!room) {
+
+      return res.json({
+        success: false,
+        message: '방이 없음'
+      });
+    }
+
+    if (
+      !room.password ||
+      room.password === req.body.password
+    ) {
+
+      return res.json({
+        success: true
+      });
+    }
+
+    res.json({
       success: false,
-      message: '방이 존재하지 않습니다.'
+      message: '비밀번호 틀림'
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      error: err.message
     });
   }
-
-  if (!room.password) {
-
-    return res.json({
-      success: true
-    });
-  }
-
-  if (room.password === req.body.password) {
-
-    return res.json({
-      success: true
-    });
-  }
-
-  res.json({
-    success: false,
-    message: '비밀번호가 틀렸습니다.'
-  });
 });
 
 app.post(
@@ -128,16 +169,14 @@ app.post(
     }
 
     res.json({
-      url: '/uploads/' + req.file.filename,
-      type: req.file.mimetype,
-      original: req.file.originalname
+      url: '/uploads/' + req.file.filename
     });
   }
 );
 
-const roomUsers = {};
-
 io.on('connection', (socket) => {
+
+  console.log('유저 접속');
 
   socket.on(
     'joinRoom',
@@ -145,106 +184,45 @@ io.on('connection', (socket) => {
 
       socket.join(roomId);
 
-      socket.roomId = roomId;
-      socket.nickname = nickname;
-
-      if (!roomUsers[roomId]) {
-        roomUsers[roomId] = [];
-      }
-
-      roomUsers[roomId] =
-        roomUsers[roomId].filter(
-          user => user.socketId !== socket.id
-        );
-
-      roomUsers[roomId].push({
-        socketId: socket.id,
-        nickname
-      });
-
-      const uniqueUsers = [
-        ...new Set(
-          roomUsers[roomId].map(
-            user => user.nickname
-          )
-        )
-      ];
-
       const messages = await Message.find({
         roomId: String(roomId)
-      }).sort({createdAt:1});
-
-      io.to(roomId).emit(
-        'systemMessage',
-        {
-          text: `${nickname}님이 입장했습니다.`
-        }
-      );
-
-      io.to(roomId).emit(
-        'userList',
-        uniqueUsers
-      );
+      });
 
       socket.emit(
         'loadMessages',
         messages
       );
+
+      io.to(roomId).emit(
+        'systemMessage',
+        {
+          message: `${nickname} 입장`
+        }
+      );
     }
   );
 
-  socket.on('chatMessage', async (data) => {
+  socket.on(
+    'chatMessage',
+    async (data) => {
 
-    await Message.create({
-      roomId: String(data.roomId),
-      nickname: data.nickname,
-      message: data.message || '',
-      file: data.file || null
-    });
+      await Message.create({
+        roomId: String(data.roomId),
+        nickname: data.nickname,
+        message: data.message
+      });
 
-    io.to(data.roomId).emit(
-      'chatMessage',
-      data
-    );
-  });
-
-  socket.on('disconnect', () => {
-
-    const roomId = socket.roomId;
-
-    if (
-      !roomId ||
-      !roomUsers[roomId]
-    ) return;
-
-    roomUsers[roomId] =
-      roomUsers[roomId].filter(
-        user =>
-          user.socketId !== socket.id
+      io.to(data.roomId).emit(
+        'chatMessage',
+        data
       );
-
-    const uniqueUsers = [
-      ...new Set(
-        roomUsers[roomId].map(
-          user => user.nickname
-        )
-      )
-    ];
-
-    io.to(roomId).emit(
-      'systemMessage',
-      {
-        text: `${socket.nickname}님이 퇴장했습니다.`
-      }
-    );
-
-    io.to(roomId).emit(
-      'userList',
-      uniqueUsers
-    );
-  });
+    }
+  );
 });
 
 server.listen(PORT, () => {
-  console.log('Server running');
+
+  console.log(
+    `Server running on ${PORT}`
+  );
 });
