@@ -182,6 +182,8 @@ io.on('connection', (socket) => {
     'joinRoom',
     async ({ roomId, nickname }) => {
 
+      nickname = nickname || '익명';
+
       socket.join(roomId);
 
       const messages = await Message.find({
@@ -206,14 +208,18 @@ io.on('connection', (socket) => {
     'chatMessage',
     async (data) => {
 
-    await Message.create({
-      roomId: String(data.roomId),
-      nickname: data.nickname || '익명',
-      message: data.message || data.text || ''
-    });
+      await Message.create({
+        roomId: String(data.roomId),
+        nickname: data.nickname || '익명',
+        message: data.message || data.text || ''
+      });
+
       io.to(data.roomId).emit(
         'chatMessage',
-        data
+        {
+          nickname: data.nickname || '익명',
+          message: data.message || data.text || ''
+        }
       );
     }
   );
