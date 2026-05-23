@@ -1,0 +1,25 @@
+# MongoDB 설정 방법
+
+1. MongoDB Atlas 가입
+https://www.mongodb.com/cloud/atlas
+
+2. 무료 Cluster 생성
+
+3. Database User 생성
+
+4. Network Access:
+0.0.0.0/0 추가
+
+5. Connect > Drivers > Node.js
+
+6. 연결 주소 복사
+
+7. Render 환경변수 추가
+
+KEY:
+MONGO_URI
+
+VALUE:
+mongodb+srv://...
+
+8. 배포 후 자동 저장됨
