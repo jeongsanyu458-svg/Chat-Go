@@ -206,12 +206,11 @@ io.on('connection', (socket) => {
     'chatMessage',
     async (data) => {
 
-      await Message.create({
-        roomId: String(data.roomId),
-        nickname: data.nickname,
-        message: data.message
-      });
-
+    await Message.create({
+      roomId: String(data.roomId),
+      nickname: data.nickname || '익명',
+      message: data.message || data.text || ''
+    });
       io.to(data.roomId).emit(
         'chatMessage',
         data
