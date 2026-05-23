@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Korea Chat Go</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>Korea Chat Go</h1>
+
+<div>
+  닉네임:
+  <input id="nickname">
+  <button onclick="saveNickname()">저장</button>
+  <button onclick="changeNickname()">변경</button>
+</div>
+
+<h2>방 목록</h2>
+
+<input id="searchRoom">
+<button onclick="loadRooms()">검색</button>
+
+<ul id="roomList"></ul>
+
+<h2>방 만들기</h2>
+
+<input id="roomName" placeholder="방 이름">
+
+<label>
+  <input type="checkbox" id="privateCheck">
+  비밀번호
+</label>
+
+<input id="roomPassword" placeholder="비밀번호">
+
+<button onclick="createRoom()">생성</button>
+
+<hr>
+
+<h2 id="currentRoom"></h2>
+
+<div class="chat-wrapper">
+
+  <div>
+    <div id="chat"></div>
+
+    <input id="message" placeholder="메시지를 입력">
+    <button onclick="sendMessage()">전송</button>
+
+    <br><br>
+
+    <input type="file" id="fileInput">
+    <button onclick="uploadFile()">업로드</button>
+  </div>
+
+  <div class="sidebar">
+    <h3>접속자</h3>
+    <div id="users"></div>
+  </div>
+
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="client.js"></script>
+
+</body>
+</html>
