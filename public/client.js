@@ -856,3 +856,27 @@ if (lastRoom) {
 
   }, 500);
 }
+/* =========================
+   GLOBAL FUNCTIONS
+========================= */
+
+window.loadRooms =
+  loadRooms;
+
+window.createRoom =
+  createRoom;
+
+window.joinRoom =
+  joinRoom;
+
+window.sendMessage =
+  sendMessage;
+
+window.uploadFile =
+  uploadFile;
+
+window.saveNickname =
+  saveNickname;
+
+window.changeNickname =
+  changeNickname;
