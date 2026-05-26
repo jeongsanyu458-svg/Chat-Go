@@ -8,249 +8,567 @@ const nicknameInput =
 nicknameInput.value =
   localStorage.getItem('nickname') || '';
 
+
+
+
+
+/* =========================
+   UTILS
+========================= */
+
+function safeText(text = '') {
+
+  return String(text)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function safeURL(url = '') {
+
+  if (
+    typeof url !== 'string'
+  ) {
+    return '';
+  }
+
+  if (
+    url.startsWith('/uploads/')
+  ) {
+    return url;
+  }
+
+  return '';
+}
+
+
+
+
+
+/* =========================
+   NICKNAME
+========================= */
+
 function saveNickname() {
+
+  const nickname =
+    safeText(nicknameInput.value)
+    .slice(0, 30);
+
+  nicknameInput.value =
+    nickname;
 
   localStorage.setItem(
     'nickname',
-    nicknameInput.value
+    nickname
   );
 }
 
 function changeNickname() {
 
-  localStorage.removeItem('nickname');
+  localStorage.removeItem(
+    'nickname'
+  );
 
   location.reload();
 }
 
+
+
+
+
+/* =========================
+   ROOM LIST
+========================= */
+
 async function loadRooms() {
 
-  const res = await fetch('/rooms');
+  try {
 
-  const rooms = await res.json();
+    const res =
+      await fetch('/rooms');
 
-  const ul =
-    document.getElementById('roomList');
+    const rooms =
+      await res.json();
 
-  ul.innerHTML = '';
+    const ul =
+      document.getElementById(
+        'roomList'
+      );
 
-  rooms.forEach(room => {
+    ul.innerHTML = '';
 
-    const li =
-      document.createElement('li');
+    rooms.forEach(room => {
 
-    li.innerHTML = `
-      ${room.name} by ${room.owner}
-      <button onclick="joinRoom(${room.id})">
-        입장
-      </button>
-    `;
+      const li =
+        document.createElement('li');
 
-    ul.appendChild(li);
-  });
+      const text =
+        document.createTextNode(
+          `${safeText(room.name)} by ${safeText(room.owner)} `
+        );
+
+      const button =
+        document.createElement(
+          'button'
+        );
+
+      button.textContent =
+        '입장';
+
+      button.onclick = () => {
+        joinRoom(room.id);
+      };
+
+      li.appendChild(text);
+
+      li.appendChild(button);
+
+      ul.appendChild(li);
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    alert('방 목록 불러오기 실패');
+  }
 }
+
+
+
+
+
+/* =========================
+   CREATE ROOM
+========================= */
 
 async function createRoom() {
 
-  const name =
-    document.getElementById(
-      'roomName'
-    ).value;
+  try {
 
-  const password =
-    document.getElementById(
-      'privateCheck'
-    ).checked
-      ? document.getElementById(
-          'roomPassword'
+    const name =
+      safeText(
+        document.getElementById(
+          'roomName'
         ).value
+      ).slice(0, 50);
+
+    if (!name) {
+
+      alert('방 이름 입력');
+
+      return;
+    }
+
+    const password =
+      document.getElementById(
+        'privateCheck'
+      ).checked
+
+      ? safeText(
+          document.getElementById(
+            'roomPassword'
+          ).value
+        ).slice(0, 50)
+
       : '';
 
-  const res = await fetch(
-    '/create-room',
-    {
-      method: 'POST',
+    const res =
+      await fetch(
+        '/create-room',
+        {
+          method: 'POST',
 
-      headers: {
-        'Content-Type':
-          'application/json'
-      },
+          headers: {
+            'Content-Type':
+              'application/json'
+          },
 
-      body: JSON.stringify({
-        name,
-        owner: nicknameInput.value,
-        password
-      })
-    }
-  );
+          body: JSON.stringify({
 
-  const room = await res.json();
+            name,
 
-  loadRooms();
+            owner:
+              safeText(
+                nicknameInput.value
+              ).slice(0, 30),
 
-  joinRoom(room.id);
+            password
+          })
+        }
+      );
+
+    const room =
+      await res.json();
+
+    loadRooms();
+
+    joinRoom(room.id);
+
+  } catch (err) {
+
+    console.error(err);
+
+    alert('방 생성 실패');
+  }
 }
+
+
+
+
+
+/* =========================
+   JOIN ROOM
+========================= */
 
 async function joinRoom(roomId) {
 
-  const roomsRes =
-    await fetch('/rooms');
+  try {
 
-  const rooms =
-    await roomsRes.json();
+    const roomsRes =
+      await fetch('/rooms');
 
-  const room =
-    rooms.find(r => r.id == roomId);
+    const rooms =
+      await roomsRes.json();
 
-  if (!room) {
+    const room =
+      rooms.find(
+        r => r.id == roomId
+      );
 
-    alert('방이 존재하지 않습니다.');
+    if (!room) {
 
-    return;
-  }
-
-  if (room.password) {
-
-    const inputPassword =
-      prompt('비밀번호를 입력하세요');
-
-    if (inputPassword === null)
-      return;
-
-    const verifyRes =
-      await fetch('/verify-room', {
-
-        method: 'POST',
-
-        headers: {
-          'Content-Type':
-            'application/json'
-        },
-
-        body: JSON.stringify({
-          roomId,
-          password: inputPassword
-        })
-      });
-
-    const verify =
-      await verifyRes.json();
-
-    if (!verify.success) {
-
-      alert(verify.message);
+      alert(
+        '방이 존재하지 않습니다.'
+      );
 
       return;
     }
+
+    if (room.password) {
+
+      const inputPassword =
+        prompt(
+          '비밀번호 입력'
+        );
+
+      if (
+        inputPassword === null
+      ) {
+        return;
+      }
+
+      const verifyRes =
+        await fetch(
+          '/verify-room',
+          {
+            method: 'POST',
+
+            headers: {
+              'Content-Type':
+                'application/json'
+            },
+
+            body: JSON.stringify({
+
+              roomId,
+
+              password:
+                safeText(
+                  inputPassword
+                )
+            })
+          }
+        );
+
+      const verify =
+        await verifyRes.json();
+
+      if (!verify.success) {
+
+        alert(
+          verify.message
+        );
+
+        return;
+      }
+    }
+
+    currentRoom = roomId;
+
+    localStorage.setItem(
+      'lastRoom',
+      roomId
+    );
+
+    document.getElementById(
+      'currentRoom'
+    ).textContent =
+      `방: ${roomId}`;
+
+    socket.emit(
+      'joinRoom',
+      {
+        roomId,
+
+        nickname:
+          safeText(
+            nicknameInput.value
+          ).slice(0, 30)
+      }
+    );
+
+  } catch (err) {
+
+    console.error(err);
+
+    alert('방 입장 실패');
   }
-
-  currentRoom = roomId;
-
-  localStorage.setItem(
-    'lastRoom',
-    roomId
-  );
-
-  document.getElementById(
-    'currentRoom'
-  ).innerText = `방: ${roomId}`;
-
-  socket.emit('joinRoom', {
-    roomId,
-    nickname: nicknameInput.value
-  });
 }
 
-function appendMessage(text) {
 
-  const div =
-    document.createElement('div');
 
-  div.innerHTML = text;
 
-  document
-    .getElementById('chat')
-    .appendChild(div);
 
-  document.getElementById(
-    'chat'
-  ).scrollTop =
+/* =========================
+   MESSAGE RENDER
+========================= */
+
+function appendMessage({
+
+  nickname = '',
+
+  message = '',
+
+  system = false
+
+}) {
+
+  const chat =
     document.getElementById(
       'chat'
-    ).scrollHeight;
+    );
+
+  const div =
+    document.createElement(
+      'div'
+    );
+
+  if (system) {
+
+    const i =
+      document.createElement(
+        'i'
+      );
+
+    i.textContent =
+      safeText(message);
+
+    div.appendChild(i);
+
+  } else {
+
+    const b =
+      document.createElement(
+        'b'
+      );
+
+    b.textContent =
+      safeText(nickname) + ': ';
+
+    const span =
+      document.createElement(
+        'span'
+      );
+
+    span.textContent =
+      safeText(message);
+
+    div.appendChild(b);
+
+    div.appendChild(span);
+  }
+
+  chat.appendChild(div);
+
+  chat.scrollTop =
+    chat.scrollHeight;
 }
+
+
+
+
+
+/* =========================
+   FILE RENDER
+========================= */
 
 function renderFileMessage(
   nickname,
   file
 ) {
 
-  // 이미지/GIF
+  const chat =
+    document.getElementById(
+      'chat'
+    );
+
+  const wrap =
+    document.createElement(
+      'div'
+    );
+
+  const name =
+    document.createElement(
+      'b'
+    );
+
+  name.textContent =
+    safeText(nickname);
+
+  wrap.appendChild(name);
+
+  wrap.appendChild(
+    document.createElement('br')
+  );
+
+  const fileURL =
+    safeURL(file.url);
+
+  if (!fileURL) {
+    return;
+  }
+
+  // IMAGE
   if (
-    file.type.startsWith('image/')
+    file.type &&
+    file.type.startsWith(
+      'image/'
+    )
   ) {
 
-    appendMessage(`
-      <b>${nickname}</b><br>
+    const img =
+      document.createElement(
+        'img'
+      );
 
-      <img
-        src="${file.url}"
-        class="preview"
-      >
-    `);
+    img.src = fileURL;
 
-  // 동영상
+    img.className =
+      'preview';
+
+    img.loading = 'lazy';
+
+    wrap.appendChild(img);
+
+  // VIDEO
   } else if (
-    file.type.startsWith('video/')
+
+    file.type &&
+    file.type.startsWith(
+      'video/'
+    )
+
   ) {
 
-    appendMessage(`
-      <b>${nickname}</b><br>
+    const video =
+      document.createElement(
+        'video'
+      );
 
-      <video
-        controls
-        class="preview-video"
-      >
-        <source
-          src="${file.url}"
-          type="${file.type}"
-        >
-      </video>
-    `);
+    video.controls = true;
 
+    video.className =
+      'preview-video';
+
+    video.src = fileURL;
+
+    wrap.appendChild(video);
+
+  // OTHER
   } else {
 
-    appendMessage(`
-      <b>${nickname}</b><br>
+    const a =
+      document.createElement(
+        'a'
+      );
 
-      <a
-        href="${file.url}"
-        target="_blank"
-      >
-        ${file.original}
-      </a>
-    `);
+    a.href = fileURL;
+
+    a.target = '_blank';
+
+    a.rel =
+      'noopener noreferrer';
+
+    a.textContent =
+      safeText(
+        file.original ||
+        '파일'
+      );
+
+    wrap.appendChild(a);
   }
+
+  chat.appendChild(wrap);
+
+  chat.scrollTop =
+    chat.scrollHeight;
 }
 
+
+
+
+
+/* =========================
+   SEND MESSAGE
+========================= */
+
 function sendMessage() {
+
+  if (!currentRoom) {
+
+    alert('방 입장 필요');
+
+    return;
+  }
 
   const input =
     document.getElementById(
       'message'
     );
 
-  if (!input.value.trim())
-    return;
+  const message =
+    safeText(input.value)
+    .slice(0, 1000);
 
-  socket.emit('chatMessage', {
-    roomId: currentRoom,
-    nickname: nicknameInput.value,
-    message: input.value
-  });
+  if (!message) {
+    return;
+  }
+
+  socket.emit(
+    'chatMessage',
+    {
+      roomId: currentRoom,
+
+      nickname:
+        safeText(
+          nicknameInput.value
+        ).slice(0, 30),
+
+      message
+    }
+  );
 
   input.value = '';
 }
+
+
+
+
+
+/* =========================
+   ENTER KEY
+========================= */
 
 document
   .getElementById('message')
@@ -259,10 +577,21 @@ document
     (e) => {
 
       if (e.key === 'Enter') {
+
+        e.preventDefault();
+
         sendMessage();
       }
     }
   );
+
+
+
+
+
+/* =========================
+   SOCKET EVENTS
+========================= */
 
 socket.on(
   'chatMessage',
@@ -277,42 +606,80 @@ socket.on(
 
     } else {
 
-      appendMessage(`
-        <b>${data.nickname}</b>:
-        ${data.message}
-      `);
+      appendMessage({
+        nickname:
+          data.nickname,
+
+        message:
+          data.message
+      });
     }
   }
 );
+
+
+
+
 
 socket.on(
   'systemMessage',
   (data) => {
 
-    appendMessage(`
-      <i>${data.text}</i>
-    `);
+    appendMessage({
+
+      message:
+        data.message ||
+        '시스템 메시지',
+
+      system: true
+    });
   }
 );
+
+
+
+
 
 socket.on(
   'userList',
   (users) => {
 
-    document.getElementById(
-      'users'
-    ).innerHTML =
-      users.join('<br>');
+    const usersBox =
+      document.getElementById(
+        'users'
+      );
+
+    usersBox.innerHTML = '';
+
+    users.forEach(user => {
+
+      const div =
+        document.createElement(
+          'div'
+        );
+
+      div.textContent =
+        safeText(user);
+
+      usersBox.appendChild(div);
+    });
   }
 );
+
+
+
+
 
 socket.on(
   'loadMessages',
   (messages) => {
 
-    document.getElementById(
-      'chat'
-    ).innerHTML = '';
+    const chat =
+      document.getElementById(
+        'chat'
+      );
+
+    chat.innerHTML = '';
 
     messages.forEach(msg => {
 
@@ -325,16 +692,35 @@ socket.on(
 
       } else {
 
-        appendMessage(`
-          <b>${msg.nickname}</b>:
-          ${msg.message}
-        `);
+        appendMessage({
+
+          nickname:
+            msg.nickname,
+
+          message:
+            msg.message
+        });
       }
     });
   }
 );
 
+
+
+
+
+/* =========================
+   FILE UPLOAD
+========================= */
+
 async function uploadFile() {
+
+  if (!currentRoom) {
+
+    alert('방 입장 필요');
+
+    return;
+  }
 
   const file =
     document.getElementById(
@@ -348,37 +734,96 @@ async function uploadFile() {
     return;
   }
 
+  const allowed = [
+
+    'image/png',
+    'image/jpeg',
+    'image/gif',
+    'image/webp',
+
+    'video/mp4',
+    'video/webm',
+    'video/ogg'
+  ];
+
+  if (
+    !allowed.includes(
+      file.type
+    )
+  ) {
+
+    alert(
+      '허용되지 않은 파일'
+    );
+
+    return;
+  }
+
+  if (
+    file.size >
+    20 * 1024 * 1024
+  ) {
+
+    alert(
+      '20MB 이하만 가능'
+    );
+
+    return;
+  }
+
   const form =
     new FormData();
 
-  form.append('file', file);
+  form.append(
+    'file',
+    file
+  );
 
   try {
 
     const res =
-      await fetch('/upload', {
-
-        method: 'POST',
-
-        body: form
-      });
+      await fetch(
+        '/upload',
+        {
+          method: 'POST',
+          body: form
+        }
+      );
 
     const data =
       await res.json();
 
-    socket.emit('chatMessage', {
+    if (!data.url) {
 
-      roomId: currentRoom,
+      alert('업로드 실패');
 
-      nickname:
-        nicknameInput.value,
+      return;
+    }
 
-      file: {
-        url: data.url,
-        type: data.type,
-        original: data.original
+    socket.emit(
+      'chatMessage',
+      {
+
+        roomId:
+          currentRoom,
+
+        nickname:
+          safeText(
+            nicknameInput.value
+          ).slice(0, 30),
+
+        file: {
+
+          url: data.url,
+
+          type:
+            file.type,
+
+          original:
+            file.name
+        }
       }
-    });
+    );
 
   } catch (err) {
 
@@ -388,10 +833,20 @@ async function uploadFile() {
   }
 }
 
+
+
+
+
+/* =========================
+   INIT
+========================= */
+
 loadRooms();
 
 const lastRoom =
-  localStorage.getItem('lastRoom');
+  localStorage.getItem(
+    'lastRoom'
+  );
 
 if (lastRoom) {
 
